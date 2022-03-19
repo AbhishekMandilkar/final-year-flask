@@ -1,3 +1,4 @@
+from cProfile import label
 from importlib.resources import path
 import json
 import os
@@ -15,8 +16,8 @@ app.config['TESTING'] = True
 #yolo config
 net = cv2.dnn.readNet('./models/yolov4-custom_last.weights', './models/yolov4-custom.cfg')
 classes = []
-# with open("classes.txt", "r") as f:
-#     classes = f.read().splitlines()
+with open("./classes.txt", "r") as f:
+    classes = f.read().splitlines()
 colors = np.random.uniform(0, 255, size=(100, 3))
 
 # uploads config
@@ -47,8 +48,13 @@ def home():
             app.logger.info('function is about to hit %s')
             img.save(os.path.join(app.config['UPLOAD_FOLDER'], img.filename))
             path = "./images/"+img.filename
-            modelRunner(path)
-            return "Uploaded Successfully"
+            label = modelRunner(path)
+            if len(label) > 0:
+                print("label",label)
+                return jsonify({"status": 1, "label": label})
+            else:
+                print("labelnot done")
+                return jsonify({"status":0,"message":"No label found"})
         else:
             return "no file"
 
@@ -72,7 +78,7 @@ def modelRunner(image):
     net.setInput(blob)
     output_layers_names = net.getUnconnectedOutLayersNames()
     layerOutputs = net.forward(output_layers_names)
-
+    
     boxes = []
     confidences = []
     class_ids = []
@@ -93,13 +99,13 @@ def modelRunner(image):
 
                 boxes.append([x, y, w, h])
                 print("confidence ",float(confidence))
-                confidences[0] = float(confidence)
+                confidences.append(float(confidence))
                 class_ids.append(class_id)
 
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.2, 0.3)
-    print(confidences)
+  
     
-
+    label = ""
     if len(indexes)>0:
         print("hi from condition")
         for i in indexes.flatten():
@@ -108,8 +114,8 @@ def modelRunner(image):
             confidence = str(round(confidences[i],2))
             color = colors[i]
             cv2.rectangle(img, (x,y), (x+w, y+h), color, 2)
-            app.logger.info('label %s' , label)
-         
+
+    return label     
 
     
         
